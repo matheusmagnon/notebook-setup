@@ -1,0 +1,13 @@
+# earlyoom — mata o processo mais faminto ANTES do kernel travar a máquina.
+#
+# O OOM killer do kernel só age quando a memória já acabou de verdade; até lá o
+# sistema passa minutos em thrashing de swap com o mouse travado. O earlyoom
+# age antes, olhando o percentual disponível.
+#
+# -m 8   : age quando a RAM disponível cai abaixo de 8%
+# -s 5   : ...e o swap livre abaixo de 5% (as duas condições juntas)
+# -r 3600: relatório de memória no journal a cada hora (útil pra pós-mortem)
+# --avoid: nunca escolher estes como vítima — perder a sessão gráfica ou o
+#          terminal é pior que perder uma aba
+# --prefer: candidatos preferenciais — navegador e Electron são quem incha
+EARLYOOM_ARGS="-m 8 -s 5 -r 3600 --avoid '(^|/)(systemd|gnome-shell|gdm3|Xorg|sshd|gnome-terminal-server|ptyxis)$' --prefer '(^|/)(chrome|chromium|firefox|thunderbird|electron|code|cursor)$'"

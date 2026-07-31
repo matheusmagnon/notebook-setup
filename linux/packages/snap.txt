@@ -1,0 +1,6 @@
+chromium
+cups
+firefox
+snap-store
+thunderbird
+vlc

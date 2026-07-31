@@ -1,0 +1,11 @@
+[Unit]
+Description=Logitech LogiOps Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/logid
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

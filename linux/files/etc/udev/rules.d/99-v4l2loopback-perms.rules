@@ -1,0 +1,15 @@
+# Permissões para devices virtuais do v4l2loopback.
+#
+# Problema que isso resolve:
+# A regra que vem com o pacote (60-persistent-v4l2loopback.rules) só dá
+# GROUP="video" ao device de CONTROLE (/dev/v4l2loopback) e aos atributos em
+# sysfs — não ao /dev/videoN gerado. E a ACL do logind (70-uaccess.rules) é
+# aplicada de forma assíncrona e não é confiável para devices criados por
+# `modprobe` fora do contexto da sessão gráfica.
+#
+# Resultado sem esta regra: /dev/videoN nasce root:root 0600, e o ffmpeg
+# rodando como usuário morre com "Permission denied" — o sintoma observado
+# nos logs de webcam-sl2-logs/ era só "capture falhou", sem causa aparente.
+
+SUBSYSTEM=="video4linux", KERNEL=="video*", DEVPATH=="*/virtual/*", \
+  GROUP="video", MODE="0660", TAG+="uaccess"

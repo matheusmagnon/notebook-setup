@@ -1,0 +1,7 @@
+Vitals@CoreCoding.com
+bluetooth-battery@michalw.github.com
+ding@rastersoft.com
+snapd-prompting@canonical.com
+tiling-assistant@ubuntu.com
+ubuntu-appindicators@ubuntu.com
+ubuntu-dock@ubuntu.com

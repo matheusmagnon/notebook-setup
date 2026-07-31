@@ -1,0 +1,45 @@
+# Brewfile — pacotes Homebrew para um notebook macOS.
+#
+# Instalar com:  brew bundle --file=macos/Brewfile
+# Atualizar com: brew bundle dump --file=macos/Brewfile --force  (depois de
+# instalar algo novo e querer versionar).
+#
+# Esta lista é o conjunto mínimo para reproduzir o fluxo de trabalho atual
+# (dev + câmera Canon como webcam). Apps via --cask usam brew, não .dmg manual.
+
+# --- CLI / dev -------------------------------------------------------------
+tap "homebrew/cask-fonts"
+
+brew "git"
+brew "gh"
+brew "curl"
+brew "jq"
+brew "ripgrep"
+brew "fd"
+brew "htop"
+brew "tmux"
+brew "neovim"
+brew "python@3.13"
+brew "node"
+brew "pnpm"
+brew "go"
+brew "rustup-init"
+brew "pkg-config"
+
+# --- Câmera Canon como webcam ---------------------------------------------
+# gphoto2 fala com a câmera por USB; ffmpeg transcode/transmite o stream.
+# A partir daqui o fluxo é diferente do Linux (sem v4l2loopback): o gphoto2
+# manda o MJPEG pro ffmpeg, que publica num socket local; o OBS pega esse
+# socket e expõe uma "Virtual Camera" para Meet/Zoom. Ver docs/canon-sl2.md.
+brew "gphoto2"
+brew "ffmpeg"
+
+# --- Apps ------------------------------------------------------------------
+cask "ghostty"        # terminal
+cask "zed"            # editor
+cask "visual-studio-code"
+cask "google-chrome"
+cask "firefox"
+cask "obs"            #Canon webcam bridge no macOS
+cask "rectangle"      # gerenciamento de janelas (equivalente ao tiling-assistant)
+cask "logi-options-plus"  # MX Master 3S — no macOS o LogiOps nativo não existe
