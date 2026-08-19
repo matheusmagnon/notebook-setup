@@ -11,13 +11,16 @@ notebook-setup/
 │   ├── 20-camera.sh          # v4l2loopback + udev + grupo video + canon-webcam
 │   ├── 30-peripherals.sh     # logiops (MX Master 3S) + piper/ratbagd
 │   ├── 40-packages.sh        # restauração opcional de apps (--packages)
+│   ├── 50-dock.sh            # Ubuntu Dock em subconjunto de monitores
 │   ├── files/                # configs versionadas, espelham /etc
-│   │   └── etc/
-│   │       ├── sysctl.d/99-magno-tuning.conf
-│   │       ├── udev/rules.d/99-v4l2loopback-perms.rules
-│   │       ├── default/earlyoom
-│   │       ├── systemd/system/logid.service
-│   │       └── logid.cfg
+│   │   ├── etc/
+│   │   │   ├── apt/apt.conf.d/99-ubuntu-dock-monitors-patch
+│   │   │   ├── sysctl.d/99-magno-tuning.conf
+│   │   │   ├── udev/rules.d/99-v4l2loopback-perms.rules
+│   │   │   ├── default/earlyoom
+│   │   │   ├── systemd/system/logid.service
+│   │   │   └── logid.cfg
+│   │   └── usr/local/bin/ubuntu-dock-monitors-patch
 │   └── packages/             # listas para recriar o ambiente de apps
 │       ├── apt.txt
 │       ├── snap.txt
@@ -28,6 +31,7 @@ notebook-setup/
 │   └── Brewfile
 └── docs/
     ├── canon-sl2.md
+    ├── dock-multi-monitor.md
     ├── memory-tuning.md
     └── structure.md          # este arquivo
 ```

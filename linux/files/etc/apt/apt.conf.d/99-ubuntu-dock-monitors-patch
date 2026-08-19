@@ -1,0 +1,3 @@
+// Reaplica o patch de multi-monitor da Ubuntu Dock depois que o apt
+// atualiza/reinstala gnome-shell-extension-ubuntu-dock.
+DPkg::Post-Invoke { "if [ -x /usr/local/bin/ubuntu-dock-monitors-patch ]; then /usr/local/bin/ubuntu-dock-monitors-patch --quiet || true; fi"; };

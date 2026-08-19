@@ -15,7 +15,10 @@ Tudo é idempotente: pode rodar quantas vezes quiser.
    ou gphoto2 + OBS Virtual Camera (macOS). Um único comando `canon-webcam`.
 3. **Periféricos** — LogiOps p/ o MX Master 3S (botões laterais = volume),
    piper/ratbagd.
-4. *(opcional)* **Apps** — restaura a lista de pacotes APT, snaps e extensões
+4. **Doca em duas telas** — patch na Ubuntu Dock para ela aparecer num
+   *subconjunto* de monitores (a interface só oferece "um" ou "todos"). A lista
+   fica em `~/.config/ubuntu-dock-monitors.conf`.
+5. *(opcional)* **Apps** — restaura a lista de pacotes APT, snaps e extensões
    GNOME a partir de listas versionadas.
 
 ## Começando (Ubuntu)
@@ -57,8 +60,9 @@ canon-webcam --stop       # libera a câmera e descarrega o módulo
 ```
 
 Detalhes, troubleshooting e o porquê de cada decisão em
-[`docs/`](docs/) — em especial [`canon-sl2.md`](docs/canon-sl2.md) e
-[`memory-tuning.md`](docs/memory-tuning.md).
+[`docs/`](docs/) — em especial [`canon-sl2.md`](docs/canon-sl2.md),
+[`memory-tuning.md`](docs/memory-tuning.md) e
+[`dock-multi-monitor.md`](docs/dock-multi-monitor.md).
 
 ## Variáveis de ambiente (opcional)
 

@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# ubuntu-dock-monitors-patch
+#
+# A Ubuntu Dock só oferece "um monitor" ou "todos os monitores". Este patch
+# adiciona um terceiro comportamento: com multi-monitor ligado, a doca aparece
+# APENAS nos monitores listados em ~/.config/ubuntu-dock-monitors.conf
+# (um conector por linha, ex.: DP-3 / eDP-1).
+#
+# A extensão é mode extension da sessão Ubuntu, então o GNOME ignora cópias em
+# ~/.local/share -- o patch precisa ser aplicado no arquivo do sistema.
+# O apt hook /etc/apt/apt.conf.d/99-ubuntu-dock-monitors-patch reaplica
+# automaticamente depois de atualizações do pacote.
+#
+#   ubuntu-dock-monitors-patch           aplica (idempotente)
+#   ubuntu-dock-monitors-patch --revert  restaura o original
+#
+set -euo pipefail
+
+EXT="/usr/share/gnome-shell/extensions/ubuntu-dock@ubuntu.com"
+TARGET="$EXT/docking.js"
+BACKUP_DIR="/var/lib/ubuntu-dock-monitors"
+BACKUP="$BACKUP_DIR/docking.js.dist"
+MARKER="monitors-whitelist patch"
+
+log() { [ "${QUIET:-0}" = 1 ] || echo "$@"; }
+
+[ "${1:-}" = "--quiet" ] && { QUIET=1; shift || true; }
+
+if [ ! -f "$TARGET" ]; then
+    log "ubuntu-dock não instalado ($TARGET ausente); nada a fazer."
+    exit 0
+fi
+
+if [ "${1:-}" = "--revert" ]; then
+    if [ -f "$BACKUP" ]; then
+        install -m 644 "$BACKUP" "$TARGET"
+        rm -f "$BACKUP"
+        echo "Original restaurado. Faça logout/login."
+    else
+        echo "Sem backup; use: apt reinstall gnome-shell-extension-ubuntu-dock"
+    fi
+    exit 0
+fi
+
+if grep -q "$MARKER" "$TARGET"; then
+    log "já aplicado."
+    exit 0
+fi
+
+# Aqui docking.js está sem patch: ou é a 1a vez, ou o apt sobrescreveu.
+# Nos dois casos o arquivo atual É o original -> (re)grava o backup.
+mkdir -p "$BACKUP_DIR"
+install -m 644 "$TARGET" "$BACKUP"
+
+python3 - "$TARGET" <<'PY'
+import sys
+
+path = sys.argv[1]
+src = open(path, encoding='utf-8').read()
+
+helper = '''    // [monitors-whitelist patch] Lê ~/.config/ubuntu-dock-monitors.conf e
+    // devolve os índices de monitor onde a doca pode aparecer (null = todos).
+    _getAllowedMonitors() {
+        if (!this.settings.multiMonitor)
+            return null;
+
+        const path = GLib.build_filenamev([GLib.get_user_config_dir(),
+            'ubuntu-dock-monitors.conf']);
+        let text;
+        try {
+            const [ok, bytes] = GLib.file_get_contents(path);
+            if (!ok)
+                return null;
+            text = new TextDecoder().decode(bytes);
+        } catch (e) {
+            return null;
+        }
+
+        const monitorManager = Utils.getMonitorManager();
+        const nMon = Main.layoutManager.monitors.length;
+        const indexes = [];
+        for (const rawLine of text.split('\\n')) {
+            const line = rawLine.split('#')[0].trim();
+            if (!line)
+                continue;
+            const idx = monitorManager.get_monitor_for_connector(line);
+            if (idx >= 0 && idx < nMon && !indexes.includes(idx))
+                indexes.push(idx);
+        }
+        return indexes.length ? indexes : null;
+    }
+
+'''
+
+anchor_method = "    _createDocks() {\n"
+anchor_pref = """        if (this.settings.multiMonitor ||
+            this._preferredMonitorIndex < 0 ||
+            this._preferredMonitorIndex > Main.layoutManager.monitors.length - 1)
+            this._preferredMonitorIndex = Main.layoutManager.primaryIndex;
+"""
+add_pref = """
+        // [monitors-whitelist patch] doca principal só em monitor permitido
+        const allowedMonitors = this._getAllowedMonitors();
+        if (allowedMonitors && !allowedMonitors.includes(this._preferredMonitorIndex))
+            this._preferredMonitorIndex = allowedMonitors[0];
+"""
+anchor_loop = """                if (iMon === this._preferredMonitorIndex)
+                    continue;
+"""
+add_loop = """                if (allowedMonitors && !allowedMonitors.includes(iMon))
+                    continue;
+"""
+
+for name, anchor in (('_createDocks()', anchor_method),
+                     ('preferredMonitorIndex', anchor_pref),
+                     ('loop multi-monitor', anchor_loop)):
+    if src.count(anchor) != 1:
+        sys.exit(f"ERRO: âncora '{name}' não encontrada exatamente 1x "
+                 f"(encontrada {src.count(anchor)}x). Versão nova da extensão? "
+                 f"Patch NÃO aplicado.")
+
+src = src.replace(anchor_method, helper + anchor_method, 1)
+src = src.replace(anchor_pref, anchor_pref + add_pref, 1)
+src = src.replace(anchor_loop, anchor_loop + add_loop, 1)
+
+open(path, 'w', encoding='utf-8').write(src)
+PY
+
+log "patch aplicado em $TARGET (original em $BACKUP)"
