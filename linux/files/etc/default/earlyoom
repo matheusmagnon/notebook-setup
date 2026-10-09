@@ -7,7 +7,14 @@
 # -m 8   : age quando a RAM disponível cai abaixo de 8%
 # -s 5   : ...e o swap livre abaixo de 5% (as duas condições juntas)
 # -r 3600: relatório de memória no journal a cada hora (útil pra pós-mortem)
-# --avoid: nunca escolher estes como vítima — perder a sessão gráfica ou o
-#          terminal é pior que perder uma aba
-# --prefer: candidatos preferenciais — navegador e Electron são quem incha
-EARLYOOM_ARGS="-m 8 -s 5 -r 3600 --avoid '(^|/)(systemd|gnome-shell|gdm3|Xorg|sshd|gnome-terminal-server|ptyxis)$' --prefer '(^|/)(chrome|chromium|firefox|thunderbird|electron|code|cursor)$'"
+# --ignore: NUNCA escolher estes (saem da lista de candidatos). O terminal
+#          (ghostty, instância única: matá-lo derruba todas as abas) e cada
+#          sessão do Claude Code. Casa pelo nome exato do processo — os filhos
+#          que as sessões disparam (node, next dev, chrome) continuam matáveis.
+# --avoid: só último caso (perde pontos, mas ainda pode morrer) — sessão
+#          gráfica e terminais padrão
+# --prefer: candidatos preferenciais — navegador e Electron são quem incha.
+#          Abas do Firefox aparecem como "Isolated Web Co" / "Web Content"
+#          (não como "firefox"); o "." no regex casa com o espaço, que o
+#          systemd quebraria ao dividir a variável em argumentos.
+EARLYOOM_ARGS="-m 8 -s 5 -r 3600 --ignore '(^|/)(ghostty|claude)$' --avoid '(^|/)(systemd|gnome-shell|gdm3|Xorg|sshd|gnome-terminal-server|ptyxis)$' --prefer '(^|/)(chrome|chromium|chrome-headless|firefox|Isolated.Web.Co|Web.Content|thunderbird|electron|code|cursor)$'"

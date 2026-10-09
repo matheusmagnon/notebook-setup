@@ -4,7 +4,7 @@ Contexto: **14 GiB de RAM**, uso pesado de Node/Chrome/Electron/Claude Code.
 O sintoma que motivou tudo era travamentos/freezes quando a RAM acabava — o
 notebook ficava minutos em thrashing de swap com a interface congelada.
 
-Há três peças, cada uma cobrindo uma janela diferente do problema:
+Há cinco peças, cada uma cobrindo uma janela diferente do problema:
 
 ## 1. `vm.swappiness = 20` (sysctl)
 
@@ -33,13 +33,29 @@ Config atual (`/etc/default/earlyoom`):
 
 ```
 -m 8 -s 5 -r 3600
---avoid '(systemd|gnome-shell|gdm3|Xorg|sshd|gnome-terminal-server|ptyxis)'
---prefer '(chrome|chromium|firefox|thunderbird|electron|code|cursor)'
+--ignore '(ghostty|claude)'
+--avoid  '(systemd|gnome-shell|gdm3|Xorg|sshd|gnome-terminal-server|ptyxis)'
+--prefer '(chrome|chromium|chrome-headless|firefox|Isolated.Web.Co|Web.Content|thunderbird|electron|code|cursor)'
 ```
 
 - age quando RAM disponível < 8% **e** swap livre < 5%
-- nunca escolhe a sessão gráfica / terminal como vítima
-- prefere navegadores e Electron, que são quem mais incha
+- `--ignore` = **nunca** escolhe (sai da lista de candidatos): o `ghostty`
+  (instância única — matá-lo derruba todas as abas) e cada sessão do Claude
+  Code (`claude`). Casa pelo nome exato do processo: o que as sessões
+  disparam (`node`, `next dev`, Chrome) continua matável — se um teste
+  estourar a memória, morre o teste, não a sessão.
+- `--avoid` = só em último caso (perde pontos, mas ainda pode morrer):
+  sessão gráfica e terminais padrão
+- `--prefer` = vítimas preferidas: navegadores e Electron. As **abas do
+  Firefox** se chamam `Isolated Web Co` / `Web Content` (não `firefox`) — sem
+  esses nomes a preferência só valia pro processo principal. O `.` casa com o
+  espaço: o systemd divide `$EARLYOOM_ARGS` em argumentos e um espaço literal
+  dentro do regex não é seguro.
+
+Limite assumido: se o processo que vaza for a **própria** sessão do Claude,
+nada automático a mata — o earlyoom sacrifica o resto e, no extremo, decide o
+OOM killer do kernel. (Não usamos `oom_score_adj=-1000` no ghostty: o valor é
+herdado por tudo que nasce no terminal e deixaria `node`/Chrome imortais.)
 
 > `systemd-oomd` também fica ativo (vem no Ubuntu). Os dois coexistem sem
 > conflito: o earlyoom é reativo por % disponível; o oomd atua por pressão
@@ -63,6 +79,34 @@ discos diferentes.
 O `10-memory.sh` iguala as prioridades no `/etc/fstab` (opção `pri=`). Como
 há swap em uso, a mudança só vale após reboot — e o script avisa, sem fazer
 `swapoff` (que forçaria os GB de volta pra RAM e travaria a máquina).
+
+## 4. zram (swap comprimido em RAM)
+
+`systemd-zram-generator` cria `/dev/zram0` com zstd, metade da RAM no máximo
+8 GiB, **prioridade 100** — acima dos dois arquivos de swap (10). O kernel
+manda páginas primeiro pro zram (compressão ~3×, dezenas de vezes mais rápido
+que disco); o disco vira reserva. Ativar não exige reboot nem `swapoff`: só
+soma um dispositivo.
+
+Por que não dobrar o swap em disco (proposta considerada em 2026-10-09): o
+swap estava 19/20 GiB cheio de **lixo vazado** (ver item 5), não de trabalho
+ativo. Com 40 GiB ele guardaria o dobro de lixo — e o earlyoom (`-s 5`) só
+reagiria com 2 GiB livres em vez de 1 GiB, ou seja, travamento mais longo
+antes de agir.
+
+## 5. Chrome headless órfão (`mata-chrome-orfao`)
+
+Diagnóstico de 2026-10-09: **26 árvores de Chrome órfãs** (275 processos,
+~2,3 GiB de RAM + ~5 GiB de swap, a mais velha com 8 dias). São Chromes de
+automação — `chrome-devtools-mcp` de cada sessão do Claude Code, Puppeteer do
+backend gerando PDF, Playwright — cujo dono morreu sem fechar o browser.
+
+`/usr/local/bin/mata-chrome-orfao` roda a cada 15 min (`mata-chrome-orfao.timer`)
+e encerra só o que cumpre **os três** critérios: raiz `chrome`/`chrome-headless`,
+pai = systemd (dono morto) e perfil temporário de automação em `/tmp`
+(`puppeteer_dev_chrome_profile-*` / `playwright_chromiumdev_profile-*`), órfão
+há mais de 10 min. O Chrome de uso pessoal (perfil em `~/.config`) nunca casa.
+Teste manual: `mata-chrome-orfao --dry-run`.
 
 ## Estado de referência (2026-07-30)
 

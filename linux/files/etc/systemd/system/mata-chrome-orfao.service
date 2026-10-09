@@ -1,0 +1,7 @@
+[Unit]
+Description=Encerra Chrome headless órfão (Puppeteer/Playwright) — notebook-setup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mata-chrome-orfao
+Nice=10

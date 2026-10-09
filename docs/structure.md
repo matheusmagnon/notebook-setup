@@ -7,7 +7,7 @@ notebook-setup/
 ├── linux/
 │   ├── install.sh            # ponto de entrada: sudo ./install.sh [--module M]
 │   ├── lib.sh                # helpers: install_file, run, as_user, backup
-│   ├── 10-memory.sh          # sysctl + earlyoom + swap
+│   ├── 10-memory.sh          # sysctl + earlyoom + swap + zram + Chrome órfão
 │   ├── 20-camera.sh          # v4l2loopback + udev + grupo video + canon-webcam
 │   ├── 30-peripherals.sh     # logiops (MX Master 3S) + piper/ratbagd
 │   ├── 40-packages.sh        # restauração opcional de apps (--packages)

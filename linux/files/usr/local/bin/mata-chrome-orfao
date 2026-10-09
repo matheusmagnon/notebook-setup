@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# mata-chrome-orfao — encerra Chrome headless ABANDONADO (Puppeteer/Playwright).
+#
+# Ferramentas de dev (chrome-devtools-mcp de cada sessão do Claude Code,
+# Puppeteer do backend gerando PDF, Playwright) sobem um Chrome com perfil
+# temporário em /tmp. Quando o processo dono morre sem fechar o browser, o
+# Chrome vira órfão (pai = systemd) e fica pra sempre: chegamos a ter 26
+# árvores órfãs, ~2,3 GiB de RAM + ~5 GiB de swap, a mais velha com 8 dias.
+#
+# Critério (os três juntos), pra nunca tocar num Chrome de verdade:
+#   1. raiz da árvore com nome chrome/chrome-headless-shell
+#   2. pai é o systemd (PID 1 ou o systemd --user) — o dono morreu
+#   3. perfil temporário de automação em /tmp (puppeteer_dev_chrome_profile-*
+#      ou playwright_chromiumdev_profile-*) — o seu Chrome usa ~/.config
+# e só se estiver órfão há mais de IDADE_MIN segundos.
+#
+# Uso: mata-chrome-orfao [--dry-run]   (o timer systemd roda a cada 15 min)
+set -euo pipefail
+
+IDADE_MIN="${IDADE_MIN:-600}"
+DRY=0
+[ "${1:-}" = "--dry-run" ] && DRY=1
+
+PERFIL_RE='--user-data-dir=(/tmp/(puppeteer_dev_chrome_profile|playwright_chromiumdev_profile)-[A-Za-z0-9]+)'
+
+mortos=0
+while read -r pid ppid etimes comm; do
+  case "$comm" in chrome | chrome-headless*) ;; *) continue ;; esac
+  [ "$etimes" -ge "$IDADE_MIN" ] || continue
+
+  pai="$(ps -o comm= -p "$ppid" 2>/dev/null || true)"
+  [ "$pai" = "systemd" ] || continue
+
+  args="$(tr '\0' ' ' <"/proc/${pid}/cmdline" 2>/dev/null || true)"
+  [[ "$args" =~ $PERFIL_RE ]] || continue
+  perfil="${BASH_REMATCH[1]}"
+
+  if [ "$DRY" = 1 ]; then
+    echo "[dry-run] mataria pid ${pid} (órfão há ${etimes}s, perfil ${perfil})"
+    continue
+  fi
+
+  kill -TERM "$pid" 2>/dev/null || true
+  for _ in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+  kill -KILL "$pid" 2>/dev/null || true
+  # Perfil temporário só sai se ninguém mais o usa.
+  if ! pgrep -f -- "--user-data-dir=${perfil}( |$)" >/dev/null; then
+    rm -rf --one-file-system -- "$perfil"
+  fi
+  echo "encerrado pid ${pid} (órfão há ${etimes}s, perfil ${perfil})"
+  mortos=$((mortos + 1))
+done < <(ps -eo pid=,ppid=,etimes=,comm=)
+
+[ "$DRY" = 1 ] || echo "mata-chrome-orfao: ${mortos} árvore(s) órfã(s) encerrada(s)"

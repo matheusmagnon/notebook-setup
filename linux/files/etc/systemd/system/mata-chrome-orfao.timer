@@ -1,0 +1,10 @@
+[Unit]
+Description=Roda mata-chrome-orfao a cada 15 minutos — notebook-setup
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

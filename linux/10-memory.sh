@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Módulo: memória — sysctl, earlyoom e swap.
+# Módulo: memória — sysctl, earlyoom, swap, zram e limpeza de Chrome órfão.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -112,12 +112,49 @@ equalize_swap_priority() {
     e forçar isso de volta pra RAM pode travar a máquina."
 }
 
+# ------------------------------------------------------------------------ zram
+
+# Swap comprimido em RAM, com prioridade acima do swap em disco (ver
+# etc/systemd/zram-generator.conf). Ativar não mexe no swap em uso: só soma um
+# dispositivo novo, então dá pra ligar sem reiniciar.
+setup_zram() {
+  if ! has_pkg systemd-zram-generator; then
+    log "zram: instalando systemd-zram-generator"
+    run apt-get install -y systemd-zram-generator
+  fi
+  install_file "etc/systemd/zram-generator.conf"
+  run systemctl daemon-reload
+  if swapon --show=NAME --noheadings | grep -q '^/dev/zram0$'; then
+    skip "zram0 já é swap ativo ($(swapon --show=SIZE --noheadings /dev/zram0 | tr -d ' '))"
+  else
+    run systemctl start systemd-zram-setup@zram0.service
+    ok "zram0 ativo"
+  fi
+}
+
+# -------------------------------------------------- Chrome headless órfão
+
+# Chrome de automação (Puppeteer/Playwright, chrome-devtools-mcp) que perdeu o
+# dono e ficou pendurado — ver usr/local/bin/mata-chrome-orfao.
+setup_chrome_reaper() {
+  install_file "usr/local/bin/mata-chrome-orfao" 755
+  install_file "etc/systemd/system/mata-chrome-orfao.service"
+  install_file "etc/systemd/system/mata-chrome-orfao.timer"
+  run systemctl daemon-reload
+  run systemctl enable --now mata-chrome-orfao.timer
+  # Primeira passada agora, sem esperar o timer.
+  run systemctl start mata-chrome-orfao.service
+  ok "mata-chrome-orfao: timer ativo (a cada 15 min)"
+}
+
 main() {
   need_root
   setup_sysctl
   setup_earlyoom
   ensure_swapfile
   equalize_swap_priority
+  setup_zram
+  setup_chrome_reaper
 }
 
 [ "${BASH_SOURCE[0]}" = "${0}" ] && main "$@"
