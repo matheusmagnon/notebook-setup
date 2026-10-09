@@ -118,17 +118,37 @@ equalize_swap_priority() {
 # etc/systemd/zram-generator.conf). Ativar não mexe no swap em uso: só soma um
 # dispositivo novo, então dá pra ligar sem reiniciar.
 setup_zram() {
+  # Config ANTES do pacote: o postinst do systemd-zram-generator já sobe o
+  # zram0 — sem a config no lugar, ele nasce com o padrão (4G, lzo-rle).
+  install_file "etc/systemd/zram-generator.conf"
   if ! has_pkg systemd-zram-generator; then
     log "zram: instalando systemd-zram-generator"
     run apt-get install -y systemd-zram-generator
   fi
-  install_file "etc/systemd/zram-generator.conf"
   run systemctl daemon-reload
-  if swapon --show=NAME --noheadings | grep -q '^/dev/zram0$'; then
-    skip "zram0 já é swap ativo ($(swapon --show=SIZE --noheadings /dev/zram0 | tr -d ' '))"
-  else
+
+  local algo usado
+  algo="$(zramctl --output ALGORITHM --noheadings /dev/zram0 2>/dev/null | tr -d ' ' || true)"
+  if [ -z "$algo" ]; then
     run systemctl start systemd-zram-setup@zram0.service
     ok "zram0 ativo"
+  elif [ "$algo" = "zstd" ]; then
+    skip "zram0 já ativo ($(zramctl --output DISKSIZE --noheadings /dev/zram0 | tr -d ' '), zstd)"
+  else
+    # Recriar = swapoff do zram0, que devolve o conteúdo pra RAM. Só com
+    # pouco dado dentro; com muito, fica pro próximo boot.
+    usado="$(zramctl --output DATA --bytes --noheadings /dev/zram0 | tr -d ' ')"
+    if [ "${usado:-0}" -lt $((1024 * 1024 * 1024)) ]; then
+      # restart direto falha com EBUSY: o reset do dispositivo precisa do
+      # swap já desligado. Ordem: desliga o swap, reseta, recria, religa.
+      run systemctl stop dev-zram0.swap
+      run sh -c 'echo 1 > /sys/block/zram0/reset'
+      run systemctl start systemd-zram-setup@zram0.service
+      run systemctl start dev-zram0.swap
+      ok "zram0 recriado com a config do repo (estava em ${algo})"
+    else
+      warn "zram0 está em ${algo} com $((usado / 1024 / 1024)) MiB em uso — a config nova vale no próximo boot"
+    fi
   fi
 }
 
