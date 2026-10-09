@@ -14,7 +14,7 @@
 #      ou playwright_chromiumdev_profile-*) — o seu Chrome usa ~/.config
 # e só se estiver órfão há mais de IDADE_MIN segundos.
 #
-# Uso: mata-chrome-orfao [--dry-run]   (o timer systemd roda a cada 15 min)
+# Uso: mata-chrome-orfao [--dry-run]   (o timer systemd roda a cada 30 min)
 set -euo pipefail
 
 IDADE_MIN="${IDADE_MIN:-600}"

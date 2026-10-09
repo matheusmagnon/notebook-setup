@@ -1,9 +1,9 @@
 [Unit]
-Description=Roda mata-chrome-orfao a cada 15 minutos — notebook-setup
+Description=Roda mata-chrome-orfao a cada 30 minutos — notebook-setup
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=15min
+OnUnitActiveSec=30min
 AccuracySec=1min
 
 [Install]

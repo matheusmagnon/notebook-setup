@@ -101,7 +101,7 @@ Diagnóstico de 2026-10-09: **26 árvores de Chrome órfãs** (275 processos,
 automação — `chrome-devtools-mcp` de cada sessão do Claude Code, Puppeteer do
 backend gerando PDF, Playwright — cujo dono morreu sem fechar o browser.
 
-`/usr/local/bin/mata-chrome-orfao` roda a cada 15 min (`mata-chrome-orfao.timer`)
+`/usr/local/bin/mata-chrome-orfao` roda a cada 30 min (`mata-chrome-orfao.timer`)
 e encerra só o que cumpre **os três** critérios: raiz `chrome`/`chrome-headless`,
 pai = systemd (dono morto) e perfil temporário de automação em `/tmp`
 (`puppeteer_dev_chrome_profile-*` / `playwright_chromiumdev_profile-*`), órfão

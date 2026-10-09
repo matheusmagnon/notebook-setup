@@ -144,7 +144,7 @@ setup_chrome_reaper() {
   run systemctl enable --now mata-chrome-orfao.timer
   # Primeira passada agora, sem esperar o timer.
   run systemctl start mata-chrome-orfao.service
-  ok "mata-chrome-orfao: timer ativo (a cada 15 min)"
+  ok "mata-chrome-orfao: timer ativo (a cada 30 min)"
 }
 
 main() {
