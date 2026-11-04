@@ -14,7 +14,8 @@ Tudo é idempotente: pode rodar quantas vezes quiser.
 2. **Câmera Canon SL2/EOS 200D como webcam** — gphoto2 + v4l2loopback (Linux)
    ou gphoto2 + OBS Virtual Camera (macOS). Um único comando `canon-webcam`.
 3. **Periféricos** — LogiOps p/ o MX Master 3S (botões laterais = volume),
-   piper/ratbagd.
+   rolagem do MX no Bluetooth igual ao receptor, bateria do K380 no painel
+   (ver `docs/logitech-bluetooth.md`), piper/ratbagd.
 4. **Doca em duas telas** — patch na Ubuntu Dock para ela aparecer num
    *subconjunto* de monitores (a interface só oferece "um" ou "todos"). A lista
    fica em `~/.config/ubuntu-dock-monitors.conf`.

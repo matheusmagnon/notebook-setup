@@ -1,0 +1,6 @@
+[Unit]
+Description=Lê bateria do Logitech K380 via HID++ (painel do GNOME)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k380-battery

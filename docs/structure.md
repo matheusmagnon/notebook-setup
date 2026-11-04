@@ -9,18 +9,21 @@ notebook-setup/
 │   ├── lib.sh                # helpers: install_file, run, as_user, backup
 │   ├── 10-memory.sh          # sysctl + earlyoom + swap + zram + Chrome órfão
 │   ├── 20-camera.sh          # v4l2loopback + udev + grupo video + canon-webcam
-│   ├── 30-peripherals.sh     # logiops (MX Master 3S) + piper/ratbagd
+│   ├── 30-peripherals.sh     # logiops (MX Master 3S) + BT (scroll, bateria K380) + piper
 │   ├── 40-packages.sh        # restauração opcional de apps (--packages)
 │   ├── 50-dock.sh            # Ubuntu Dock em subconjunto de monitores
 │   ├── files/                # configs versionadas, espelham /etc
 │   │   ├── etc/
 │   │   │   ├── apt/apt.conf.d/99-ubuntu-dock-monitors-patch
 │   │   │   ├── sysctl.d/99-magno-tuning.conf
+│   │   │   ├── modprobe.d/no-logitech-hidpp.conf
 │   │   │   ├── udev/rules.d/99-v4l2loopback-perms.rules
+│   │   │   ├── udev/rules.d/70-k380-hidraw.rules
 │   │   │   ├── default/earlyoom
 │   │   │   ├── systemd/system/logid.service
+│   │   │   ├── systemd/user/k380-battery.{service,timer}
 │   │   │   └── logid.cfg
-│   │   └── usr/local/bin/ubuntu-dock-monitors-patch
+│   │   └── usr/local/bin/{ubuntu-dock-monitors-patch,k380-battery}
 │   └── packages/             # listas para recriar o ambiente de apps
 │       ├── apt.txt
 │       ├── snap.txt
@@ -32,6 +35,7 @@ notebook-setup/
 └── docs/
     ├── canon-sl2.md
     ├── dock-multi-monitor.md
+    ├── logitech-bluetooth.md
     ├── memory-tuning.md
     └── structure.md          # este arquivo
 ```

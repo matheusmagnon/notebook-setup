@@ -1,0 +1,99 @@
+#!/usr/bin/python3 -I
+"""k380-battery — bateria do Logitech K380 no painel do GNOME.
+
+O kernel (hid-generic) só conhece a bateria do K380 quando o teclado manda um
+relatório espontâneo, o que é raro; sem ele o UPower não lista o teclado e a
+extensão "Bluetooth battery indicator" não mostra nada. Este script:
+
+  1. lê a bateria direto no teclado via HID++ 2.0 (feature 0x1000) e grava em
+     ~/.cache/k380-battery (apaga o cache se o teclado estiver desconectado);
+  2. garante que o upower_devices.sh da extensão inclua esse cache — reaplica
+     o patch sozinho se uma atualização da extensão sobrescrever o arquivo.
+
+Roda como usuário via k380-battery.timer; o acesso ao hidraw vem da regra
+udev 70-k380-hidraw.rules (TAG uaccess).
+"""
+import glob
+import os
+import select
+import time
+
+CACHE = os.path.expanduser('~/.cache/k380-battery')
+K380_PID = '046D:0000B342'
+K380_MAC = 'f4:73:35:5d:16:83'  # casa com o registro já ativado nas prefs da extensão
+EXT_SCRIPT = os.path.expanduser(
+    '~/.local/share/gnome-shell/extensions/bluetooth-battery@michalw.github.com'
+    '/scripts/upower_devices.sh')
+MARKER = '# [notebook-setup] k380-battery'
+PATCH = f'''json=${{json%,}}
+
+{MARKER} — injetado por /usr/local/bin/k380-battery (não editar)
+k380_cache="$HOME/.cache/k380-battery"
+if [[ -s "$k380_cache" ]] && ! grep -qi '{K380_MAC}' <<< "$json"; then
+    json+=",{{\\"model\\": \\"Keyboard K380 Keyboard\\",\\"serial\\": \\"{K380_MAC}\\",\\"percentage\\": \\"$(cat "$k380_cache")%\\",\\"icon-name\\": \\"input-keyboard-symbolic\\"}}"
+fi
+json+="]"'''
+ORIGINAL_TAIL = 'json=${json%,}\njson+="]"'
+
+
+def find_hidraw():
+    for d in glob.glob('/sys/class/hidraw/hidraw*'):
+        try:
+            if K380_PID in open(d + '/device/uevent').read().upper():
+                return '/dev/' + os.path.basename(d)
+        except OSError:
+            pass
+    return None
+
+
+def hidpp(fd, idx, func, params=b''):
+    msg = bytes([0x11, 0xFF, idx, (func << 4) | 0x0A]) + params
+    os.write(fd, msg + bytes(20 - len(msg)))
+    end = time.time() + 3
+    while time.time() < end:
+        if select.select([fd], [], [], 0.5)[0]:
+            d = os.read(fd, 64)
+            if d[0] == 0x11 and d[2] in (idx, 0xFF) and (d[3] & 0x0F) == 0x0A:
+                return d
+    return None
+
+
+def read_battery():
+    dev = find_hidraw()
+    if not dev:
+        if os.path.exists(CACHE):
+            os.remove(CACHE)  # desconectado: não mostrar valor velho
+        return
+    fd = os.open(dev, os.O_RDWR)
+    try:
+        r = hidpp(fd, 0, 0, b'\x10\x00')  # IRoot.getFeature(0x1000 BatteryStatus)
+        if not r or r[2] == 0xFF or not r[4]:
+            return
+        s = hidpp(fd, r[4], 0)  # getBatteryLevelStatus
+        if s and s[2] != 0xFF and 0 < s[4] <= 100:
+            os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+            with open(CACHE + '.tmp', 'w') as f:
+                f.write(str(s[4]))
+            os.replace(CACHE + '.tmp', CACHE)
+    finally:
+        os.close(fd)
+
+
+def ensure_extension_patch():
+    try:
+        src = open(EXT_SCRIPT).read()
+    except OSError:
+        return  # extensão não instalada
+    if MARKER in src or ORIGINAL_TAIL not in src:
+        return  # já aplicado, ou a extensão mudou de formato (não arriscar)
+    with open(EXT_SCRIPT + '.tmp', 'w') as f:
+        f.write(src.replace(ORIGINAL_TAIL, PATCH))
+    os.chmod(EXT_SCRIPT + '.tmp', os.stat(EXT_SCRIPT).st_mode)
+    os.replace(EXT_SCRIPT + '.tmp', EXT_SCRIPT)
+
+
+if __name__ == '__main__':
+    try:
+        read_battery()
+    finally:
+        ensure_extension_patch()

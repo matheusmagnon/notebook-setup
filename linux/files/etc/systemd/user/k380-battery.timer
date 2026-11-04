@@ -1,0 +1,9 @@
+[Unit]
+Description=Atualiza bateria do K380 a cada 5 min
+
+[Timer]
+OnStartupSec=30s
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

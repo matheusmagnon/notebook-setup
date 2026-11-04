@@ -1,0 +1,2 @@
+# Acesso do usuário logado ao hidraw do Logitech K380 (leitura de bateria via HID++)
+SUBSYSTEM=="hidraw", KERNELS=="0005:046D:B342.*", TAG+="uaccess"

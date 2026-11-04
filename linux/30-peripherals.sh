@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Módulo: periféricos — mouse Logitech (LogiOps) e ferramentas de input.
+# Módulo: periféricos — mouse Logitech (LogiOps), ajustes de Bluetooth
+# (scroll do MX, bateria do K380 — ver docs/logitech-bluetooth.md) e input.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -32,7 +33,38 @@ setup_logid() {
   run systemctl daemon-reload
   run systemctl enable --now logid
   run systemctl restart logid
-  ok "logid ativo (MX Master 3S: botões laterais = volume)"
+  ok "logid ativo (MX Master 3S: botões laterais = volume, gesto = Super)"
+}
+
+setup_bluetooth_tweaks() {
+  # MX Master 3S via Bluetooth: o driver hid_logitech_hidpp liga hi-res scroll
+  # (15 eventos de 8/120 por dente) e a rolagem fica lenta/atrasada no
+  # GNOME/navegador. Bloqueado, o BT se comporta igual ao receptor Bolt.
+  # Botões continuam via logid (hidraw); bateria via BlueZ (GATT).
+  install_file "etc/modprobe.d/no-logitech-hidpp.conf"
+  if lsmod | grep -q '^hid_logitech_hidpp'; then
+    warn "hid_logitech_hidpp ainda carregado — reconecte o mouse ou reinicie para valer"
+  fi
+
+  # K380: bateria só aparece no painel via k380-battery (HID++ direto no hidraw).
+  install_file "etc/udev/rules.d/70-k380-hidraw.rules"
+  run udevadm control --reload
+  run udevadm trigger --subsystem-match=hidraw
+  install_file "usr/local/bin/k380-battery" 755
+  install_file "etc/systemd/user/k380-battery.service"
+  install_file "etc/systemd/user/k380-battery.timer"
+  run systemctl --global enable k380-battery.timer
+
+  local uid bus
+  uid="$(id -u "$TARGET_USER")"
+  bus="unix:path=/run/user/${uid}/bus"
+  if [ -S "/run/user/${uid}/bus" ]; then
+    run sudo -u "$TARGET_USER" env "DBUS_SESSION_BUS_ADDRESS=$bus" \
+      systemctl --user daemon-reload
+    run sudo -u "$TARGET_USER" env "DBUS_SESSION_BUS_ADDRESS=$bus" \
+      systemctl --user start k380-battery.timer k380-battery.service
+  fi
+  ok "Bluetooth: scroll do MX sem hi-res; bateria do K380 no painel"
 }
 
 setup_extras() {
@@ -52,6 +84,7 @@ main() {
   need_root
   build_logiops
   setup_logid
+  setup_bluetooth_tweaks
   setup_extras
 }
 
