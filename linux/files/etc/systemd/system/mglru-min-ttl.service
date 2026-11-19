@@ -1,0 +1,11 @@
+[Unit]
+Description=MGLRU min_ttl_ms=1000 — freio anti-thrashing (kernel docs: elimina janks sob pressao)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "echo 1000 > /sys/kernel/mm/lru_gen/min_ttl_ms"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Módulo: memória — sysctl, earlyoom, swap, zram e limpeza de Chrome órfão.
+# Módulo: memória — sysctl, earlyoom, swapfile, zswap (cmdline do GRUB),
+# MGLRU anti-thrashing, oomd off e limpeza de Chrome órfão.
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -112,44 +113,57 @@ equalize_swap_priority() {
     e forçar isso de volta pra RAM pode travar a máquina."
 }
 
-# ------------------------------------------------------------------------ zram
+# ---------------------------------------------------------------------- zswap
 
-# Swap comprimido em RAM, com prioridade acima do swap em disco (ver
-# etc/systemd/zram-generator.conf). Ativar não mexe no swap em uso: só soma um
-# dispositivo novo, então dá pra ligar sem reiniciar.
-setup_zram() {
-  # Config ANTES do pacote: o postinst do systemd-zram-generator já sobe o
-  # zram0 — sem a config no lugar, ele nasce com o padrão (4G, lzo-rle).
-  install_file "etc/systemd/zram-generator.conf"
-  if ! has_pkg systemd-zram-generator; then
-    log "zram: instalando systemd-zram-generator"
-    run apt-get install -y systemd-zram-generator
+# Cache comprimido NA FRENTE do swapfile: página fria entra no pool zstd
+# (25% da RAM) e só as mais frias vão pro disco, com eviction automática —
+# sem o modo de falha do zram "encheu, agora é sem compressão". A config
+# vive na cmdline do GRUB (ver etc/default/grub); regra do research
+# nov/2026: com swapfile real → zswap, nunca zram+zswap juntos.
+setup_zswap() {
+  install_file "etc/default/grub"
+  run update-grub
+
+  # Converte máquina que ainda usa a stack antiga (zram, até 2026-11):
+  # zram e zswap têm políticas independentes competindo pelo mesmo trabalho.
+  if has_pkg systemd-zram-generator; then
+    log "zram: removendo systemd-zram-generator (substituído pelo zswap)"
+    run systemctl stop dev-zram0.swap 2>/dev/null || true
+    run apt-get remove -y systemd-zram-generator
   fi
+  retire_file /etc/systemd/zram-generator.conf
   run systemctl daemon-reload
 
-  local algo usado
-  algo="$(zramctl --output ALGORITHM --noheadings /dev/zram0 2>/dev/null | tr -d ' ' || true)"
-  if [ -z "$algo" ]; then
-    run systemctl start systemd-zram-setup@zram0.service
-    ok "zram0 ativo"
-  elif [ "$algo" = "zstd" ]; then
-    skip "zram0 já ativo ($(zramctl --output DISKSIZE --noheadings /dev/zram0 | tr -d ' '), zstd)"
+  if grep -q "zswap.enabled=1" /proc/cmdline 2>/dev/null; then
+    ok "zswap ativo no kernel em execução ($(cat /sys/module/zswap/parameters/enabled 2>/dev/null))"
   else
-    # Recriar = swapoff do zram0, que devolve o conteúdo pra RAM. Só com
-    # pouco dado dentro; com muito, fica pro próximo boot.
-    usado="$(zramctl --output DATA --bytes --noheadings /dev/zram0 | tr -d ' ')"
-    if [ "${usado:-0}" -lt $((1024 * 1024 * 1024)) ]; then
-      # restart direto falha com EBUSY: o reset do dispositivo precisa do
-      # swap já desligado. Ordem: desliga o swap, reseta, recria, religa.
-      run systemctl stop dev-zram0.swap
-      run sh -c 'echo 1 > /sys/block/zram0/reset'
-      run systemctl start systemd-zram-setup@zram0.service
-      run systemctl start dev-zram0.swap
-      ok "zram0 recriado com a config do repo (estava em ${algo})"
-    else
-      warn "zram0 está em ${algo} com $((usado / 1024 / 1024)) MiB em uso — a config nova vale no próximo boot"
-    fi
+    ok "zswap gravado no GRUB — vale no próximo boot"
   fi
+}
+
+# ---------------------------------------------------------------------- MGLRU
+
+# min_ttl_ms: sob pressão, não sacrifica página usada há menos de 1 s —
+# corta o loop "swapa e remosstra na hora" (thrashing). A doc do kernel:
+# 1000 ms "elimina janks intoleráveis". O MGLRU em si já vem ativo no kernel.
+setup_mglru() {
+  install_file "etc/systemd/system/mglru-min-ttl.service"
+  run systemctl daemon-reload
+  run systemctl enable --now mglru-min-ttl.service
+  ok "MGLRU min_ttl_ms=$(cat /sys/kernel/mm/lru_gen/min_ttl_ms 2>/dev/null || echo '?')"
+}
+
+# ------------------------------------------------------------------ oomd off
+
+# systemd-oomd desligado e MASKED: ele mata o cgroup inteiro — na sessão
+# GNOME isso derruba a sessão toda (systemd#35270) — e o preset do Ubuntu o
+# reativa a cada release upgrade; só o mask sobrevive a isso. O earlyoom
+# fica sozinho de guarda (dispara por % disponível, no processo, não no
+# cgroup).
+setup_oomd_off() {
+  run systemctl disable --now systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
+  run systemctl mask systemd-oomd.service systemd-oomd.socket
+  ok "systemd-oomd desligado e masked (earlyoom é o único killer)"
 }
 
 # -------------------------------------------------- Chrome headless órfão
@@ -173,7 +187,9 @@ main() {
   setup_earlyoom
   ensure_swapfile
   equalize_swap_priority
-  setup_zram
+  setup_zswap
+  setup_mglru
+  setup_oomd_off
   setup_chrome_reaper
 }
 

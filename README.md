@@ -1,16 +1,18 @@
 # notebook-setup
 
 Configurações pessoais de um notebook de dev — prontas para clonar e rodar
-quando a máquina mudar. Hoje roda em **Ubuntu 25.10**; projetado para também
-cobrir **macOS** num futuro próximo.
+quando a máquina mudar. Hoje roda em **Ubuntu 26.04 LTS**; projetado para
+também cobrir **macOS** num futuro próximo.
 
 Tudo é idempotente: pode rodar quantas vezes quiser.
 
 ## O que isto configura
 
-1. **Memória** — `swappiness=20`, `vfs_cache_pressure=50`, `inotify` alto p/
-   dev, e o `earlyoom` (mata o processo faminto antes do sistema travar).
-   Resolve o sintoma de freeze com 14 GiB de RAM sob Electron/Chrome.
+1. **Memória** — zswap na frente do swapfile (cmdline do GRUB), sysctls de
+   swap comprimido (`swappiness=180`, `page-cluster=0`), MGLRU anti-thrashing
+   e `earlyoom` (`systemd-oomd` masked — mata o processo faminto antes do
+   sistema travar). Resolve o freeze com 14 GiB de RAM sob Electron/Chrome
+   (ver `docs/memory-tuning.md`).
 2. **Câmera Canon SL2/EOS 200D como webcam** — gphoto2 + v4l2loopback (Linux)
    ou gphoto2 + OBS Virtual Camera (macOS). Um único comando `canon-webcam`.
 3. **Periféricos** — LogiOps p/ o MX Master 3S (botões laterais = volume),
