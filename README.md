@@ -26,6 +26,9 @@ Tudo é idempotente: pode rodar quantas vezes quiser.
 6. **tmux** — sessões de terminal que sobrevivem a queda/reinício da GUI
    (alias `ta` = attach-ou-cria a sessão main, splits intuitivos, clipboard
    Wayland).
+7. **Docker Desktop** — sysctl que impede o crash do backend qemu
+   (`apparmor_restrict_unprivileged_userns=0`; sem isso o Ubuntu o aborta
+   no boot).
 
 ## Começando (Ubuntu)
 
