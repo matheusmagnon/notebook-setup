@@ -15,7 +15,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 source ./lib.sh
 
 MODULES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ALL_MODULES=(10-memory 20-camera 30-peripherals 50-dock 60-tmux 65-docker)
+ALL_MODULES=(10-memory 20-camera 30-peripherals 50-dock 60-tmux)
 PACKAGES_MODULE="40-packages"
 
 SELECTED=""
