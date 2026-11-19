@@ -23,6 +23,9 @@ Tudo é idempotente: pode rodar quantas vezes quiser.
    fica em `~/.config/ubuntu-dock-monitors.conf`.
 5. *(opcional)* **Apps** — restaura a lista de pacotes APT, snaps e extensões
    GNOME a partir de listas versionadas.
+6. **tmux** — sessões de terminal que sobrevivem a queda/reinício da GUI
+   (alias `ta` = attach-ou-cria a sessão main, splits intuitivos, clipboard
+   Wayland).
 
 ## Começando (Ubuntu)
 
